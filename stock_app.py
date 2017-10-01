@@ -9,11 +9,6 @@ from data_utils import DataUtils
 
 
 
-def get_data_from_file(filename):
-	with open(filename) as data_file:
-		data = json.load(data_file)
-	return data
-
 def get_data_from_api(symbol, start_date, end_date):
 	fetcher = Fetcher(symbol, start_date, end_date)
 	data = fetcher.getHistorical()
@@ -22,35 +17,6 @@ def get_data_from_api(symbol, start_date, end_date):
 
 data = get_data_from_api('AAPL', [1990, 1, 1], [2017, 9, 21])
 
-class DataUtils:
-
-	@staticmethod
-	def get_rows(data, start_index=0, end_index=None):
-		if not end_index:
-			end_index = len(data)
-		return data.iloc[start_index:end_index]
-
-	@staticmethod
-	def get_row_iterable(data, start_index=0, end_index=None):
-		if not end_index:
-			end_index = len(data)
-		return data.iloc[start_index:end_index].iterrows()
-
-	@staticmethod
-	def get_low_from_row(row):
-		return float(row['Low'])
-
-	@staticmethod
-	def get_high_from_row(row):
-		return float(row['High'])	
-
-	@staticmethod
-	def get_close_from_row(row):
-		return float(row['Close'])
-
-	@staticmethod
-	def get_date_from_row(row):
-		return row['Date']
 
 	
 
