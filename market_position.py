@@ -49,6 +49,13 @@ class MarketPosition():
 		
 		return sell_amount - taxes
 
+	def long_term_tax_rate_eligible(self, sell_date):
+		# Reformatting the sell date from a string like 
+		# '2017-01-17' to a datetime object
+		sell_date = datetime.strptime(sell_date, self.date_format)
+		position_duration = sell_date - self.buy_date
+		return position_duration.days >= self.long_term_duration
+
 
 	def num_shares(self):
 		return self.num_shares
