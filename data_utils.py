@@ -9,7 +9,10 @@ class DataUtils:
 	def get_rows(data, start_index=0, end_index=None):
 		if not end_index:
 			end_index = len(data)
-		return data.iloc[start_index:end_index]
+		rows = []
+		for index, row in data.iloc[start_index:end_index].iterrows():
+			rows.append(row)
+		return rows
 
 	@staticmethod
 	def get_row_iterable(data, start_index=0, end_index=None):
@@ -31,4 +34,4 @@ class DataUtils:
 
 	@staticmethod
 	def get_date_from_row(row):
-		return row['Date']
+		return str(row['Date'])
