@@ -8,6 +8,10 @@ from yahoo_historical import Fetcher
 from data_utils import DataUtils
 from market_position import MarketPosition
 
+# Importing the financial algorithms
+from buy_and_hold import BuyAndHold
+from zeus import Zeus
+
 
 
 def get_data_from_api(symbol, start_date, end_date):
@@ -20,22 +24,42 @@ def get_data_from_api(symbol, start_date, end_date):
 data = get_data_from_api('TSLA', [2007, 1, 1], [2017, 9, 21])
 
 
-	
-
-
-"""
-for index, row in data.iterrows():
-	print(index)
-	print(row)
-	print('-'*20)
-	#row.iloc[0]['Date']
-
-print(data[1:2].iloc[1]['Date'])
-"""
-
-
 # Inputs
+stocks_to_test = ['MSFT', 'AAPL', 'TSLA', 'NFLX', 'JNJ', 'KO', 'FB']
 starting_cash = 20000
+monthly_cash_infusion = 1000
+
+
+# Creating the algo objects (and running them the first day)
+first_day = DataUtils.get_rows(data, 0, 1)[0]
+buy_and_hold_algo = BuyAndHold(first_day, starting_cash)
+zeus_algo = Zeus(first_day, starting_cash)
+
+
+# Running the algos
+counter = 0
+num_rows = len(data)
+for index, row in DataUtils.get_row_iterable(data, 1, num_rows - 1):
+	# def run(self, data_row, cash_infusion, sell_out=False):
+	if counter == 30:
+		buy_and_hold_algo.run(row, monthly_cash_infusion)
+		zeus_algo.run(row, monthly_cash_infusion)
+		counter = 0
+	else:
+		buy_and_hold_algo.run(row, 0)
+		zeus_algo.run(row, 0)
+		counter += 1
+
+
+# Selling out the algos
+last_day = DataUtils.get_rows(data, num_rows - 1, num_rows)[0]
+buy_and_hold_results1 = buy_and_hold_algo.run(last_day, 0, True)
+zeus_results1 = zeus_algo.run(last_day, 0, True)
+
+
+
+
+
 
 # Buy and hold algorithm
 def buy_and_hold(starting_cash, data):
@@ -154,8 +178,10 @@ print('The starting cash amount is: '+str(starting_cash))
 print()
 print('Results')
 print('-'*20)
+print('buy_and_hold1: \t\t' + str(buy_and_hold_results1))
 print('buy_and_hold: \t\t' + str(buy_and_hold_results))
 print('zeus: \t\t\t' + str(zeus_results))
+print('zeus1: \t\t\t' + str(zeus_results1))
 print('zeus_hold_1_year: \t' + str(zeus_hold_1_year_results))
 
 
