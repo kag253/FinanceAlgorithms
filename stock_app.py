@@ -21,7 +21,7 @@ def get_data_from_api(symbol, start_date, end_date):
 	
 
 #fetcher = Fetcher('AAPL', [1990, 1, 1], [2017, 9, 21])
-data = get_data_from_api('TSLA', [2007, 1, 1], [2017, 9, 21])
+data = get_data_from_api('TSLA', [2017, 8, 1], [2017, 9, 21])
 
 
 # Inputs
@@ -101,13 +101,14 @@ def zeus(starting_cash, data):
 		DataUtils.get_low_from_row(first_row),
 		starting_cash
 	)
+	
 
 	for index, row in DataUtils.get_row_iterable(data, 1):
 		close = DataUtils.get_close_from_row(row)
 		high = DataUtils.get_high_from_row(row)
 		low = DataUtils.get_low_from_row(row)
 		date = DataUtils.get_date_from_row(row)
-
+		
 		if high > high_so_far:
 			high_so_far = high
 
@@ -115,12 +116,13 @@ def zeus(starting_cash, data):
 			counter += 1
 		else:
 			if market_position:
-				if (high / market_position.buy_price) >= sell_percent: 
+				if (high / market_position.buy_price) >= sell_percent:
 					balance = market_position.sell(date, high)
 					market_position = None
 			else: 
 				if (low/high_so_far) <= buy_percent:
 					market_position = MarketPosition(date, low, balance)
+		
 					
 
 	return balance

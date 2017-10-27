@@ -21,6 +21,7 @@ class Zeus():
 		self.sell_percent = 1.05
 		self.buy_percent = 0.97
 
+
 	def run(self, data_row, cash_infusion, sell_out=False):
 		close = DataUtils.get_close_from_row(data_row)
 		high = DataUtils.get_high_from_row(data_row)
@@ -29,7 +30,6 @@ class Zeus():
 
 		if sell_out:
 			self.balance = self.market_position.sell(date, high)
-
 		else:
 			if high > self.high_so_far:
 				self.high_so_far = high
@@ -47,19 +47,3 @@ class Zeus():
 
 		return self.balance
 					
-
-
-
-
-
-
-
-
-
-		# stock_price = DataUtils.get_high_from_row(data_row)
-		# date = DataUtils.get_date_from_row(data_row)
-		# if sell_out:
-		# 	balance = self.market_position.sell(date, stock_price)
-		# else:
-		# 	balance = self.market_position.current_value(stock_price)
-		# return balance
