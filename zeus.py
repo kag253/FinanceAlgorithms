@@ -29,7 +29,8 @@ class Zeus():
 		date = DataUtils.get_date_from_row(data_row)
 
 		if sell_out:
-			self.balance = self.market_position.sell(date, high)
+			if self.market_position:
+				self.balance = self.market_position.sell(date, high)
 		else:
 			if high > self.high_so_far:
 				self.high_so_far = high

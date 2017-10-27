@@ -21,7 +21,7 @@ def get_data_from_api(symbol, start_date, end_date):
 	
 
 #fetcher = Fetcher('AAPL', [1990, 1, 1], [2017, 9, 21])
-data = get_data_from_api('TSLA', [2017, 8, 1], [2017, 9, 21])
+data = get_data_from_api('MSFT', [2015, 1, 1], [2017, 9, 21])
 
 
 # Inputs
@@ -53,79 +53,10 @@ for index, row in DataUtils.get_row_iterable(data, 1, num_rows - 1):
 
 # Selling out the algos
 last_day = DataUtils.get_rows(data, num_rows - 1, num_rows)[0]
-buy_and_hold_results1 = buy_and_hold_algo.run(last_day, 0, True)
-zeus_results1 = zeus_algo.run(last_day, 0, True)
+buy_and_hold_results = buy_and_hold_algo.run(last_day, 0, True)
+zeus_results = zeus_algo.run(last_day, 0, True)
 
 
-
-
-
-
-# Buy and hold algorithm
-def buy_and_hold(starting_cash, data):
-	data_rows = DataUtils.get_rows(data, 0)
-	
-	# Buying in at the very beginning
-	first_row = data_rows[0]
-	market_position = MarketPosition(
-		DataUtils.get_date_from_row(first_row), 
-		DataUtils.get_low_from_row(first_row),
-		starting_cash
-	)
-
-	# Selling out at the end
-	last_row = data_rows[-1]
-	balance = market_position.sell(
-		DataUtils.get_date_from_row(last_row),
-		DataUtils.get_high_from_row(last_row)
-	)
-
-	return balance
-
-
-# Buys in the beginning, sells whenever 5% up and then re-buys when 
-# 3% down from 30 day moving high
-def zeus(starting_cash, data):
-	balance = starting_cash
-	watch_period = 30
-	counter = 1
-	sell_percent = 1.05
-	buy_percent = 0.97
-	
-
-	# Buying in on the first day
-	first_row = DataUtils.get_rows(data, 0, 1)[0]
-	high_so_far = DataUtils.get_high_from_row(first_row)
-	market_position = MarketPosition(
-		DataUtils.get_date_from_row(first_row), 
-		DataUtils.get_low_from_row(first_row),
-		starting_cash
-	)
-	
-
-	for index, row in DataUtils.get_row_iterable(data, 1):
-		close = DataUtils.get_close_from_row(row)
-		high = DataUtils.get_high_from_row(row)
-		low = DataUtils.get_low_from_row(row)
-		date = DataUtils.get_date_from_row(row)
-		
-		if high > high_so_far:
-			high_so_far = high
-
-		if counter < watch_period:
-			counter += 1
-		else:
-			if market_position:
-				if (high / market_position.buy_price) >= sell_percent:
-					balance = market_position.sell(date, high)
-					market_position = None
-			else: 
-				if (low/high_so_far) <= buy_percent:
-					market_position = MarketPosition(date, low, balance)
-		
-					
-
-	return balance
 
 	
 # Buys in the beginning, sells whenever 5% up AND long term tax rate eligible. 
@@ -171,8 +102,8 @@ def zeus_hold_1_year(starting_cash, data):
 
 	return balance
 
-buy_and_hold_results = buy_and_hold(starting_cash, data)
-zeus_results = zeus(starting_cash, data)
+#buy_and_hold_results = buy_and_hold(starting_cash, data)
+#zeus_results = zeus(starting_cash, data)
 zeus_hold_1_year_results = zeus_hold_1_year(starting_cash, data)
 
 
@@ -180,10 +111,8 @@ print('The starting cash amount is: '+str(starting_cash))
 print()
 print('Results')
 print('-'*20)
-print('buy_and_hold1: \t\t' + str(buy_and_hold_results1))
 print('buy_and_hold: \t\t' + str(buy_and_hold_results))
 print('zeus: \t\t\t' + str(zeus_results))
-print('zeus1: \t\t\t' + str(zeus_results1))
 print('zeus_hold_1_year: \t' + str(zeus_hold_1_year_results))
 
 
