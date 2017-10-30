@@ -15,16 +15,18 @@ class BuyAndHold():
 		high = DataUtils.get_high_from_row(data_row)
 		low = DataUtils.get_low_from_row(data_row)
 		date = DataUtils.get_date_from_row(data_row)
-		
+
 		if cash_infusion > 0:
 			new_market_position = MarketPosition(date, low, cash_infusion)
 			self.market_positions.append(new_market_position)
 
 		balance = 0
-		for mp in self.market_positions:			
-			if sell_out:
+					
+		if sell_out:
+			for mp in self.market_positions:
 				balance += mp.sell(date, high)
-			else:
+		else:
+			for mp in self.market_positions:
 				balance += mp.current_value(high)
 
 		return balance

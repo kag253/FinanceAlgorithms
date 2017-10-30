@@ -21,7 +21,7 @@ def get_data_from_api(symbol, start_date, end_date):
 	
 
 #fetcher = Fetcher('AAPL', [1990, 1, 1], [2017, 9, 21])
-data = get_data_from_api('MSFT', [2015, 1, 1], [2017, 9, 21])
+data = get_data_from_api('KO', [1990, 1, 1], [2017, 9, 21])
 
 
 # Inputs
