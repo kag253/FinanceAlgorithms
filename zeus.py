@@ -6,19 +6,19 @@ from market_position import MarketPosition
 
 class Zeus():
 	"""
-		Buys in the beginning, sells whenever 5% up and then re-buys when 
-		3% down from 30 day moving high
+		Buys in the beginning, sells whenever sell_percent% up and then re-buys when 
+		buy_percent% down from 30 day moving high
 	"""
 
-	def __init__(self, first_day, starting_cash):
+	def __init__(self, first_day, starting_cash, sell_percent, buy_percent):
 		date = DataUtils.get_date_from_row(first_day)
 		low = DataUtils.get_low_from_row(first_day)
 		high = DataUtils.get_high_from_row(first_day)
 	
 		self.market_positions = [MarketPosition(date, low, starting_cash)]
 		self.cash = 0
-		self.sell_percent = 1.05
-		self.buy_percent = 0.97
+		self.sell_percent = 1 + sell_percent
+		self.buy_percent = 1 - buy_percent
 
 		self.thirty_day_queue = queue.PriorityQueue()
 		self.insert_high_into_30_day_queue(high, date)
