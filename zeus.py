@@ -14,7 +14,7 @@ class Zeus():
 		date = DataUtils.get_date_from_row(first_day)
 		low = DataUtils.get_low_from_row(first_day)
 		high = DataUtils.get_high_from_row(first_day)
-	
+		# print('Starting at low: '+str(low))
 		self.market_positions = [MarketPosition(date, low, starting_cash)]
 		self.cash = 0
 		self.sell_percent = 1 + sell_percent
@@ -48,19 +48,27 @@ class Zeus():
 		self.thirty_day_queue.put((-high, date_obj))
 
 	def run(self, data_row, cash_infusion, sell_out=False):
+		# print('Cash is: '+str(self.cash))
+		# print('Cash infusion is: '+str(cash_infusion))
+
 		close = DataUtils.get_close_from_row(data_row)
 		high = DataUtils.get_high_from_row(data_row)
 		low = DataUtils.get_low_from_row(data_row)
 		date = DataUtils.get_date_from_row(data_row)
 		self.cash += cash_infusion
 
-		self.insert_high_into_30_day_queue(high, date)
+		midpoint = low + ((high-low)/2)
+
+		
 
 		# Checking if algo should sell out of any market positions
+		sold_today = False
 		temp = []
 		for mp in self.market_positions:
-			if sell_out or (high / mp.buy_price) >= self.sell_percent: 
-				self.cash += mp.sell(date, high)
+			if sell_out or (midpoint / mp.buy_price) >= self.sell_percent: 
+				#print('Selling on '+str(date))
+				sold_today = True
+				self.cash += mp.sell(date, midpoint)
 			else:
 				temp.append(mp)
 		self.market_positions = temp
@@ -68,13 +76,14 @@ class Zeus():
 
 
 		# Checking if algo should buy into the market
-		if not sell_out:
+		if not sell_out and not sold_today:
 			if self.counter < self.watch_period:
 				self.counter += 1
 			else:
 				thirty_day_high = self.thirty_day_queue.queue[0][0]
-				if (low / thirty_day_high) <= self.buy_percent:
-					new_market_position = MarketPosition(date, low, self.cash)
+				if (midpoint / thirty_day_high) <= self.buy_percent and self.cash > 0:
+					#print('Buying on: '+str(date))
+					new_market_position = MarketPosition(date, midpoint, self.cash)
 					self.market_positions.append(new_market_position)
 					self.cash = 0
 
@@ -82,6 +91,8 @@ class Zeus():
 		balance = self.cash
 		for mp in self.market_positions:
 			balance += mp.current_value(high)
+
+		self.insert_high_into_30_day_queue(high, date)
 
 		return balance	
 

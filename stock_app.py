@@ -21,12 +21,12 @@ def get_data_from_api(symbol, start_date, end_date):
 	
 
 #fetcher = Fetcher('AAPL', [1990, 1, 1], [2017, 9, 21])
-data = get_data_from_api('KO', [1980, 1, 1], [2017, 9, 21])
+data = get_data_from_api('KO', [1980, 9, 1], [2017, 10, 1])
 
 
 # Inputs
 stocks_to_test = ['MSFT', 'AAPL', 'TSLA', 'NFLX', 'JNJ', 'KO', 'FB']
-starting_cash = 20000
+starting_cash = 5000
 monthly_cash_infusion = 1000
 
 
