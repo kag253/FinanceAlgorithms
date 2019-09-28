@@ -122,7 +122,6 @@ def main():
 	    	delete_extracted_file(extracted_file)
 	    	print('Number of rows processed for this file: ' + str(rows_processed))
 	    	total_rows_processed += rows_processed
-	    break
 
 	print('Data processing complete, total number of rows processed: ' + str(total_rows_processed))
 
