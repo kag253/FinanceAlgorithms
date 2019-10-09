@@ -1,3 +1,4 @@
 /spy-wheel-algorithms/data
 /spy-wheel-algorithms/data_backup
-/spy-wheel-algorithms/options_data.db
+/spy-wheel-algorithms/spy_data.db
+/spy-wheel-algorithms/config.json
