@@ -36,14 +36,14 @@ def main(starting_cash, starting_date, end_date, db_file):
 
 
 	# Printing out the results
-	for algo_obj in algorithm_objects:
-		algo_obj.print_out()
+	# for algo_obj in algorithm_objects:
+	# 	algo_obj.print_out()
 
 
 
 DB_FILE = 'spy_data.db'
 STARTING_CASH = 400000
-START_DATE = '2019-01-01'
+START_DATE = '2019-01-02'
 END_DATE = '2019-09-14'
 
 main(STARTING_CASH, START_DATE, END_DATE, DB_FILE)
