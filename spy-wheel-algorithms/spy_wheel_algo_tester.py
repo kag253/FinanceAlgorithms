@@ -42,7 +42,7 @@ def main(starting_cash, starting_date, end_date, db_file):
 
 
 DB_FILE = 'spy_data.db'
-STARTING_CASH = 400000
+STARTING_CASH = 30000
 START_DATE = '2019-01-02'
 END_DATE = '2019-09-14'
 
