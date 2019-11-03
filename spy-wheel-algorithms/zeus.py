@@ -1,6 +1,7 @@
 from datetime import datetime, date, timedelta
+from enum import Enum
 
-class SpyOptionsTableSchema(Enum):
+class SpyOptionsTableSchema:
 	QUOTE_DATETIME = 0
 	EXPIRATION = 1
 	STRIKE = 2
@@ -16,6 +17,7 @@ class Zeus:
 	"""
 
 	def __init__(self, starting_cash, start_date, end_date, db_conn):
+		self.starting_cash = starting_cash
 		self.cash = starting_cash
 		self.shares_held = []
 		self.premiums_collected = 0
@@ -26,15 +28,19 @@ class Zeus:
 		self.end_date = datetime.fromisoformat(end_date)
 		self.db_conn = db_conn
 		self.put_chunks = 4
-		self.put_otm_offset = 1
+		self.put_otm_offset = 2
+		self.missed_weeks = 0
 
 
 
 	def print_out(self):
-		print('Zeus Algorithm')
+		print('----------------------- Zeus Algorithm Stats -----------------------')
 
 		print('Current cash is: ' + str(self.cash))
-		print('Current number of SPY shares held: ') # TODO
+		print('Current number of SPY shares held: ')
+		for item in self.shares_held:
+			print(str(item))
+		print('\n')
 
 		print('Open positions:')
 		for pos in self.open_positions:
@@ -46,11 +52,14 @@ class Zeus:
 			print(str(pos))
 		print('\n')
 
+		total_income = self.premiums_collected + self.capital_gains_collected
 		print('Premiums collected: ' + str(self.premiums_collected))
 		print('Capital gains collected ' + str(self.capital_gains_collected))
-		print('Total income: ' + str(self.premiums_collected + self.capital_gains_collected))
+		print('Total income: ' + str(total_income))
+		print('Missed Weeks: ' +str(self.missed_weeks))
+		print('Return percentage: ' + str((total_income/self.starting_cash)*100))
 
-	def retrieveCalls(self, quote_date, expiration_date, share_cost):
+	def retrieveCall(self, quote_date, expiration_date, cost_basis):
 		next_day = quote_date + timedelta(days=1)
 		with self.db_conn as conn:
 			cur = conn.cursor()
@@ -61,7 +70,8 @@ class Zeus:
 				AND option_type = ?
 				AND expiration = ?
 				AND strike > ?
-				ORDER BY strike, quote_datetime
+				ORDER BY strike ASC
+				limit 1
 			'''
 			cur.execute(
 				sql, 
@@ -70,12 +80,11 @@ class Zeus:
 					next_day.isoformat(' '), 
 					'C', 
 					expiration_date.isoformat(),
-					share_cost
+					cost_basis
 				)
 			)
 			rows = cur.fetchall()
 			return rows
-
 	
 	def retrievePuts(self, quote_date, expiration_date):
 		next_day = quote_date + timedelta(days=1)
@@ -88,8 +97,9 @@ class Zeus:
 				AND option_type = ?
 				AND expiration = ?
 				AND strike < underlying_bid
+				GROUP BY strike
 				ORDER BY strike DESC, quote_datetime ASC
-				limit 200;
+				limit 50;
 			'''
 			cur.execute(
 				sql, 
@@ -103,52 +113,78 @@ class Zeus:
 			rows = cur.fetchall()
 			return rows
 	
-	def choose_call(self, calls, shares):
-		pass
+	def choose_calls(self, shares, expiration_date):
+		opened_positions = []
+		unused_shares = []
+		premium = 0
+		# calls = self.retrieveCalls(self.current_date, friday_this_week.date())
+		for item in shares:
+			call = self.retrieveCall(self.current_date, expiration_date, item['cost_basis'])
+			if call:
+				call = call[0]
+				premium += call[SpyOptionsTableSchema.BID]
+				opened_positions.append({
+					'contract': call,
+					'contract_count': item['share_count'] / 100,
+					'cost_basis': item['cost_basis']
+				})
+			else:
+				self.missed_weeks += 1
+				unused_shares.append(item)
+		return (opened_positions, premium, unused_shares)
 
-	def choose_puts(self, puts):
+	def choose_puts(self, puts, put_chunks, put_otm_offset, cash_available):
 		"""
-			This put choosing strategy works like this: puts are sold in groups
-			of "put_chunks" size, out of the money.  How far out of the money is 
-			determined by put_otm_offset.
+			Given an array of puts and the cash available, this function executes
+			the Zeus put choosing strategy. This put choosing strategy works like 
+			this: puts are sold in groups of "put_chunks" size, out of the money.  
+			How far out of the money is determined by put_otm_offset.
+
+			Returns the opened positions, their cash liability, and the premium collected.
 		"""
-		print('-----------------------------')
-		
+		premium = 0
+		opened_positions = []
+		cash_liability = 0
 		offset_counter = 0
-		have_enough_cash = True
-		while have_enough_cash:
-			for put in puts:
-				market_price = put[SpyOptionsTableSchema.UNDERLYING_ASK]
-				strike = put[SpyOptionsTableSchema.STRIKE]
+		enough_cash = True
+		for put in puts:
+			market_price = put[SpyOptionsTableSchema.UNDERLYING_ASK]
+			strike = put[SpyOptionsTableSchema.STRIKE]
 
-				# Put OTM is when the stock price is greater than the strike 
-				if market_price > strike:
-					if offset_counter < self.put_otm_offset:
-						offset_counter += 1
-						continue
-					put_liability = underlying_ask * 100
-					num_possible_puts = int(self.cash/put_liability)
-					if num_possible_puts < self.put_chunks:
-						self.cash = self.cash - (num_possible_puts * put_liability)
-						have_enough_cash = False
-					else:
-						self.cash = self.cash - (put_liability * self.put_chunks)
-					
+			# Put OTM is when the stock price is greater than the strike 
+			if market_price > strike:
+				if offset_counter < put_otm_offset:
+					offset_counter += 1
+					continue
+
+				put_liability = strike * 100
+				num_possible_puts = int(cash_available/put_liability)
+
+				if num_possible_puts < put_chunks:
+					chunk_liability = num_possible_puts * put_liability
+
+					# At this point we're out of cash so we break
+					enough_cash = False
+				else:
+					chunk_liability = put_liability * put_chunks
+					num_possible_puts = put_chunks
+
+				cash_liability += chunk_liability
+				cash_available -= chunk_liability
+
+				if num_possible_puts:
+					premium += put[SpyOptionsTableSchema.BID] * 100 * num_possible_puts
+					opened_positions.append({
+						'contract': put,
+						'contract_count': num_possible_puts
+					})
+				
+				if not enough_cash:
+					break
 		
-		# class SpyOptionsTableSchema(Enum):
-		# 	QUOTE_DATETIME = 0
-		# 	EXPIRATION = 1
-		# 	STRIKE = 2
-		# 	OPTION_TYPE = 3
-		# 	BID = 4
-		# 	ASK = 5
-		# 	UNDERLYING_BID = 6
-		# 	UNDERLYING_ASK = 7
-		# for put in puts:
-		# 	print(put)
-		# print(puts)
-		return None
-	
+		
+		return (opened_positions, cash_liability, premium)
+					
 	def tryToSellOptions(self):
 		# This algorithm only sells weekly options, which are options sold
 		# on Mondays that expire on the following Friday.  Thus it is assumed 
@@ -157,67 +193,31 @@ class Zeus:
 
 		# Trying to sell Covered Calls (CC)
 		if len(self.shares_held) > 0:
-			calls = self.retrieveCalls(self.current_date, friday_this_week.date())
-
 			# Executing the Zeus call choosing strategy
-			chosen_calls = self.choose_calls(calls, self.shares_held)
-			if chosen_calls:
-				self.open_positions + chosen_calls
+			opened_positions, premium, unused_shares = self.choose_calls(self.shares_held, friday_this_week.date())
+			if opened_positions:
+				self.premiums_collected += premium
+				self.open_positions += opened_positions
+				self.shares_held = unused_shares
 
-			# call_closest_to_money = None
-			# for strike in calls:
-			# 	call_closest_to_money = calls[strike][0]
-			# 	break
-			# self.open_positions.append(
-			# 	{
-			# 		'type': 'CC', 
-			# 		'contracts_num': num_possible_contracts, 
-			# 		'contract': call_closest_to_money,
-			# 		'share_cost': self.share_cost
-			# 	}
-			# )
-			# self.share_count = 0 # Setting to 0 because these shares are now spoken for (temporarily)
 
 		# Trying to sell Covered Puts (CP)
 		if self.cash > 0:
 			puts = self.retrievePuts(self.current_date, friday_this_week.date())
-
 			# Executing the Zeus put choosing strategy
-			chosen_puts = self.choose_puts(puts)
-			if chosen_puts:
-				self.open_positions + chosen_puts
+			opened_positions, cash_liability, premium = self.choose_puts(
+				puts,
+				self.put_chunks,
+				self.put_otm_offset,
+				self.cash
+			)
+			if opened_positions:
+				self.premiums_collected += premium
+				self.open_positions += opened_positions
+				self.cash -= cash_liability
 
-			# Just grabbing the put contracts at the first quote time
-			# available, since that is all we need
-			# puts_first_quote_time = None
-			# for quote in puts:
-			# 	puts_first_quote_time = puts[quote]
-			# 	break
 
-			# # Want to start at a specified offset "out of the money"
-			# strike_offset, offset_counter = 1, 0
-			
-			# for put in puts_first_quote_time:
-				# strike = put[2]
-				# if offset_counter < strike_offset:
-				# 	offset_counter += 1
-				# 	continue
-			
-				# liability = strike * 100 # 100 shares per contract
-				# num_contracts_per_strike = 4 # Particular detail of strategy
-				# num_contracts_sold_at_strike = 0
-				# while liability < self.cash and num_contracts_sold_at_strike < num_contracts_per_strike:
-				# 	self.open_positions.append(
-				# 		{
-				# 			'type': 'CP', 
-				# 			'contracts_num': 1, 
-				# 			'contract': put
-				# 		}
-				# 	)
-				# 	self.cash -= liability
-				# 	num_contracts_sold_at_strike += 1
-
-	def getTodaysHighLow(self):
+	def getHighLow(self, date):
 		with self.db_conn as conn:
 			cur = conn.cursor()
 			sql = ''' 
@@ -233,62 +233,86 @@ class Zeus:
 
 	
 	def checkOpenPositions(self):
-		todaysHighLow = self.getTodaysHighLow()
-
+		"""
+			This function checks if any open positions will be 
+			exercised or will expire.  A covered put (CP) will be exercised
+			if the market prices dips below the breakeven point.  A covered
+			call (CC) will exercise if the market price goes above the
+			breakeven point.
+		"""
+		todaysHighLow = self.getHighLow(self.current_date)
+		
+		
 		if not todaysHighLow:
 			return 
-		
 		high = todaysHighLow[2]
 		low = todaysHighLow[3]
-		for item in self.open_positions:
-			contract = item['contract']
-			contract_type = ['type']
-			strike = contract[2]
-			premium = contract[4]
-			expiration = contract[1]
-			breakeven = strike + premium
+		
+		
+		positions_still_open = []
+		for position in self.open_positions:
+			contract = position['contract']
+			contract_type = contract[SpyOptionsTableSchema.OPTION_TYPE]
+			expiration = contract[SpyOptionsTableSchema.EXPIRATION]
+			strike = contract[SpyOptionsTableSchema.STRIKE]
+			share_count = 100 * position['contract_count'] # 100 shares per contract
 
-			if contract_type == 'CC' and (high > breakeven or self.current_date >= expiration):
-				self.premiums_collected += premium
-				self.cash += premium
-				if high > breakeven: # in this case the CC is exercised
-					# self.
-					pass
-				elif self.current_date >= expiration: # in this case the CC expires worthless
-					self.premiums_collected += premium
-					self.cash += premium
+			# Covered Put Positions
+			if contract_type == 'P':
+				breakeven =  strike - contract[SpyOptionsTableSchema.BID]
 
-				
-			else:
-				pass
+				# CP expired worthless
+				if self.current_date > datetime.fromisoformat(expiration): 
+					self.cash += strike * share_count
+					position['result'] = 'expired worthless'
+					self.trade_history.append(position)
+				elif low < breakeven:  # CP exercised
+					self.shares_held.append({
+						'share_count': share_count,
+						'cost_basis': strike
+					})
+					position['result'] = 'exercised'
+					self.trade_history.append(position)
+				else: # Nothing happens to CP yet
+					positions_still_open.append(position)
 
-			print('HERE')
-			print(todaysHighLow)
-		# for item in self.open_positions:
+			else: # Covered Call Positions
+				breakeven =  strike + contract[SpyOptionsTableSchema.BID]
+				cost_basis = position['cost_basis']
+
+				# CC expired worthless
+				if self.current_date > datetime.fromisoformat(expiration): 
+					self.shares_held.append({
+						'share_count': share_count,
+						'cost_basis': cost_basis
+					})
+					position['result'] = 'expired worthless'
+					self.trade_history.append(position)
+				elif high > breakeven:  # CC exercised
+					capital_returned = strike * share_count
+					capital_invested = cost_basis * share_count
+					self.capital_gains_collected += capital_returned - capital_invested
+					self.cash += capital_returned
+					position['result'] = 'exercised'
+					self.trade_history.append(position)
+				else: # Nothing happens to CC yet
+					positions_still_open.append(position)
+
+			self.open_positions = positions_still_open
 			
-				
-
-
-
 
 	def run(self):
 		while self.current_date <= self.end_date:
-
-			t = False
+			# Checks open positions to see if any will be
+			# exercised or will expire
+			if self.open_positions:
+				self.checkOpenPositions()
 
 			# Check if the day is Monday (weekday() value is 0), 
 			# which is the day the algo sells options. 
 			if self.current_date.weekday() == 0:
 				self.tryToSellOptions()
-				t = True
-				
-			print(self.current_date)
-			print(self.open_positions)
-			if t:
-				break
-			# Checks open positions to see if any will be
-			# exercised or will expire
-			self.checkOpenPositions()
 
+				
 			# Moving to the next day
 			self.current_date += timedelta(days=1)
